@@ -1,0 +1,235 @@
+---
+title: "Introduction to Rvest: Scraping Faculty Directories"
+author: "Adam Garber"
+date: "2024-02-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+library(tidyverse)
+library(rvest)
+library(robotstxt)
+library(gt)
+```
+
+
+***
+
+Example 1: University of Florida 
+
+***
+
+Check to see that the website allows scraping
+```{r}
+
+paths_allowed("https://arts.ufl.edu/directory/")
+
+```
+
+Read the html from the url address 
+```{r}
+
+page_uf <- read_html("https://arts.ufl.edu/directory/")
+
+page_uf
+```
+
+## Search for names
+```{r}
+# Note: We have 350 names on this page!
+page_uf %>% 
+  html_nodes(".trigger .title")
+
+```
+
+
+```{r}
+
+page_uf %>% 
+  html_nodes(".trigger .title") %>% 
+  html_text()
+
+names <- page_uf %>% 
+  html_nodes(".trigger .title") %>% 
+  html_text()
+
+```
+
+## Search for emails
+
+Check nodes: Data has what we need (but also some extra stuff...)
+```{r}
+# Note: Only 317 emails were extracted (uh oh!)
+page_uf %>% 
+  html_nodes("span:nth-child(1) a")
+```
+
+Check which attributes are available in the selected nodes with `html_attrs()`
+```{r}
+page_uf %>% 
+  html_nodes("span:nth-child(1) a") %>% 
+  html_attrs()
+```
+
+Select the desired attribute using `html_attr()`
+```{r}
+page_uf %>% 
+  html_nodes("span:nth-child(1) a") %>% 
+  html_attr("title")
+
+```
+
+
+```{r}
+# Note: Only 317 emails were extracted (uh oh!)
+emails <- page_uf %>% 
+  html_nodes("span:nth-child(1) a") %>% 
+  html_attr("title")
+
+emails
+```
+
+## Search for positions
+
+```{r}
+positions <- page_uf %>% 
+  html_nodes(".position") %>% 
+  html_text()
+
+positions
+```
+
+
+## Create a `data.frame` for the UM directory 
+```{r}
+df_um <- tibble(
+  order = 1:350,
+  name = names,
+  position = positions,
+  #email = emails
+)
+
+df_um %>% filter(position == "Professor Emeritus")
+
+```
+
+***
+
+Example 2: Washington State University 
+
+***
+
+Read the html from the url address 
+```{r}
+
+url <- "https://everett.wsu.edu/paul-pitre/"
+
+page <- read_html(url) 
+
+```
+
+
+## Search for names, postions, and emails 
+
+```{r}
+
+names <- page %>% 
+  html_nodes(".wsu-c-article-header__title") %>% 
+  html_text()
+
+names
+
+positions <- page %>% 
+  html_nodes(".wsu-c-callout__title") %>% 
+  html_text2()
+
+positions
+
+emails <- page %>% 
+  html_nodes("a:nth-child(3)") %>% 
+  html_attr("href") %>% 
+  str_remove("mailto:")
+  
+emails
+
+```
+
+## Create the data.frame combining each variable
+```{r}
+df_wsu <- tibble(
+  name = names,
+  email = emails,
+  position = positions, 
+  url = url
+)
+
+df_wsu
+```
+
+## Create a function
+```{r}
+
+scrape_page <- function(url){
+
+ page <- read_html(url)   
+ 
+ names <- page %>% 
+   html_nodes(".wsu-c-article-header__title") %>% 
+   html_text()
+
+ positions <- page %>% 
+   html_nodes(".wsu-c-callout__title") %>% 
+   html_text2()
+
+ emails <- page %>% 
+   html_nodes("a:nth-child(3)") %>% 
+   html_attr("href") %>% 
+   str_remove("mailto:")
+  
+ df_wsu <- tibble(
+   name = names,
+   email = emails,
+   position = positions, 
+   url = url)
+}
+
+scrape_page(url = "https://everett.wsu.edu/paul-pitre/") %>% 
+  glimpse()
+
+```
+
+## Read in the list of profile page URLs
+```{r}
+
+read_html("https://everett.wsu.edu/faculty-staff-directory/") %>% 
+  html_nodes(".wsu-c-card__heading-link")
+  
+read_html("https://everett.wsu.edu/faculty-staff-directory/") %>% 
+  html_nodes(".wsu-c-card__heading-link") %>% 
+  html_attrs() 
+
+all_pages <- read_html("https://everett.wsu.edu/faculty-staff-directory/") %>% 
+  html_nodes(".wsu-c-card__heading-link") %>% 
+  html_attr("href") 
+
+all_pages
+```
+
+
+## Iterate using `map_dfr()` - Scrape 48 faculty profile pages
+```{r}
+
+wsu_directory <- map_dfr(all_pages, scrape_page)
+
+wsu_directory %>% gt()
+
+```
+
+
+
