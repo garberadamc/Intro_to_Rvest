@@ -96,7 +96,6 @@ emails
 ```
 
 ## Search for positions
-
 ```{r}
 positions <- page_uf %>% 
   html_nodes(".position") %>% 
@@ -106,18 +105,27 @@ positions
 ```
 
 
+## Missing emails: hack off the bottom of the `df` (rows after 281 
+
+Note: They are mostly professor emeriti or theater, arts, music faculty 
+```{r}
+email <- emails %>% head(281)
+name <- names %>% head(281)
+position <- positions %>% head(281)
+```
+
+
 ## Create a `data.frame` for the UM directory 
 ```{r}
 df_um <- tibble(
-  order = 1:350,
-  name = names,
-  position = positions,
-  #email = emails
-)
-
-df_um %>% filter(position == "Professor Emeritus")
-
+  order = 1:281,
+  name = name,
+  position = position,
+  email = email) 
+ 
+df_um %>% glimpse()
 ```
+
 
 ***
 
@@ -138,18 +146,41 @@ page <- read_html(url)
 ## Search for names, postions, and emails 
 
 ```{r}
-
 names <- page %>% 
   html_nodes(".wsu-c-article-header__title") %>% 
   html_text()
 
 names
+```
 
+hmm, not exactly what we want...
+```{r}
+page %>% 
+  html_nodes(".wsu-c-callout__title") %>% 
+  html_text()
+```
+
+Let's try `html_text2()`
+```{r}
 positions <- page %>% 
   html_nodes(".wsu-c-callout__title") %>% 
   html_text2()
 
 positions
+```
+
+## When the text is not in the right format (very common) use the `stringr` functions:
+e.g., `str_remove(), str_replace(), str_subset(), str_squish(), str_c()...`
+
+```{r}
+page %>% 
+  html_nodes("a:nth-child(3)") %>% 
+  html_attr("href")
+
+page %>% 
+  html_nodes("a:nth-child(3)") %>% 
+  html_attr("href") %>% 
+  str_remove("mailto:")
 
 emails <- page %>% 
   html_nodes("a:nth-child(3)") %>% 
@@ -157,8 +188,10 @@ emails <- page %>%
   str_remove("mailto:")
   
 emails
-
 ```
+
+
+
 
 ## Create the data.frame combining each variable
 ```{r}
